@@ -1,0 +1,8 @@
+{
+  "name": "TriageAssist M3 Prototype",
+  "description": "A Material 3 / Jetpack Compose inspired health triage and risk assessment app designed for low-literacy users in remote areas. Includes patient profiling, record keeping, AI-assisted triage, and pharmacy locator.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
