@@ -1,4 +1,3 @@
-
 export enum OperatorRole {
   PATIENT = 'Patient',
   CAREGIVER = 'Caregiver',
@@ -7,11 +6,12 @@ export enum OperatorRole {
 
 export enum Sex {
   FEMALE = 'Female',
-  MALE = 'Male',
-  INTERSEX = 'Intersex / Differences of Sex Development'
+  MALE = 'Male'
 }
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'O+' | 'O-' | 'AB+' | 'AB-' | 'Unknown';
+
+export type Language = 'en' | 'pt';
 
 export enum RiskLevel {
   GREEN = 'LOW RISK',
@@ -21,34 +21,73 @@ export enum RiskLevel {
 
 export interface PatientLocation {
   street: string;
+  houseNumber?: string;
   bairro: string;
   distrito: string;
   cidade: string;
+  provincia: string;
   country: string;
 }
 
-export interface Patient {
+export interface HospitalRecord {
+  hospitalName: string;
+  registrationNumber: string;
+}
+
+export interface RecordAttachment {
   id: string;
-  fullName: string;
-  sex: Sex;
-  age: number;
-  height?: number; // in cm
-  bloodType?: BloodType;
-  weight?: number; // in kg
-  isPregnantOrBreastfeeding?: boolean;
-  knownConditions: string[];
-  allergies?: string;
-  currentMedications?: string;
-  location?: PatientLocation;
+  name: string;
+  mimeType: string;
+  data: string; // Base64 encoded data
+}
+
+export interface Vitals {
+  systolic?: number;
+  diastolic?: number;
+  heartRate?: number;
+  oxygenSaturation?: number; // New: SpO2 %
+  temperature?: number; // New: Body temp in Celsius
 }
 
 export interface MedicalRecord {
   id: string;
   patientId: string;
   operatorRole: OperatorRole;
-  timestamp: number;
+  timestamp: number; // Entry creation date
+  documentDate?: number; // Original date of the document/event
   content: string;
-  attachments: string[];
+  vitals?: Vitals;
+  attachments: RecordAttachment[];
+}
+
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+}
+
+export interface Patient {
+  id: string;
+  fullName: string;
+  phoneNumber?: string;
+  emergencyContact?: EmergencyContact;
+  sex: Sex;
+  age: number;
+  height?: number; // in cm
+  bloodType?: BloodType;
+  weight?: number; // in kg
+  race?: string;
+  maritalStatus?: string;
+  hospitalRecords?: HospitalRecord[];
+  isPregnantOrBreastfeeding?: boolean;
+  pregnancyWeeks?: number; // New field for BMI context
+  knownConditions: string[];
+  allergies?: string;
+  chronicDiseases?: string; // New: Separated from history
+  pastMedicalHistory?: string; // New: Separated from chronic
+  chronicMedications?: string; // New: Long-term medications
+  currentMedications?: string; // Acute/reason for current visit
+  location?: PatientLocation;
 }
 
 export interface TriageResult {
