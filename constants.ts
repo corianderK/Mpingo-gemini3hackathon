@@ -1,3 +1,4 @@
+
 import { RiskLevel, Patient, Sex } from './types';
 
 export const APP_STRINGS = {
@@ -178,6 +179,7 @@ export const APP_STRINGS = {
       TITLE: 'Clinical Record',
       CAPTURE_TITLE: 'Clinical Media Capture',
       CAPTURE_DESC: 'Attach files to record',
+      SUPPORTED_FORMATS: 'Supported: Images, Audio, Video, PDF, JSON, CSV, Excel, Word (Doc/Docx)',
       TAKE_PHOTO: 'Take Photo',
       RECORD_VIDEO: 'Record Video',
       VOICE_NOTE: 'Voice Note',
@@ -379,6 +381,7 @@ export const APP_STRINGS = {
       TITLE: 'Registo Clínico',
       CAPTURE_TITLE: 'Captura de Mídia Clínica',
       CAPTURE_DESC: 'Anexar arquivos ao registro',
+      SUPPORTED_FORMATS: 'Suportado: Imagens, Áudio, Vídeo, PDF, JSON, CSV, Excel, Word (Doc/Docx)',
       TAKE_PHOTO: 'Tirar Foto',
       RECORD_VIDEO: 'Registo de Vídeo',
       VOICE_NOTE: 'Nota de Voz',
