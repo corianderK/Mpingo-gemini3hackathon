@@ -79,12 +79,42 @@ const RecordScreen: React.FC<RecordProps> = ({
   };
 
   const openAttachment = (att: RecordAttachment) => {
-    if (att.mimeType === 'application/pdf') {
-      const newWindow = window.open();
-      if (newWindow) {
-        newWindow.document.write(`<iframe width='100%' height='100%' src='${att.data}'></iframe>`);
+    const mime = att.mimeType.toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isAudio = mime.startsWith('audio/');
+    const isVideo = mime.startsWith('video/');
+    
+    // For Word, Excel, CSV, JSON, and PDF: we trigger a download or open in a new window
+    const isDoc = mime.includes('pdf') || 
+                  mime.includes('msword') || 
+                  mime.includes('wordprocessingml') || 
+                  mime.includes('excel') || 
+                  mime.includes('spreadsheetml') ||
+                  mime.includes('csv') ||
+                  mime.includes('json');
+
+    if (isDoc) {
+      // Logic for documents: PDF can try iframe preview, others download
+      if (mime.includes('pdf')) {
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write(`<iframe width='100%' height='100%' src='${att.data}'></iframe>`);
+          return;
+        }
       }
+      
+      // Fallback: Trigger Download for Word/Excel/CSV
+      const link = document.createElement('a');
+      link.href = att.data;
+      link.download = att.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (isImage || isAudio || isVideo) {
+      // These types are supported in our in-app modal
+      setViewingAttachment(att);
     } else {
+      // Unknown type
       setViewingAttachment(att);
     }
   };
@@ -94,6 +124,8 @@ const RecordScreen: React.FC<RecordProps> = ({
     if (mime.startsWith('audio/')) return { label: 'AUDIO', color: 'bg-purple-100 text-purple-600' };
     if (mime.startsWith('video/')) return { label: 'VIDEO', color: 'bg-red-100 text-red-600' };
     if (mime.includes('pdf')) return { label: 'PDF', color: 'bg-amber-100 text-amber-600' };
+    if (mime.includes('msword') || mime.includes('wordprocessingml')) return { label: 'DOC', color: 'bg-indigo-100 text-indigo-600' };
+    if (mime.includes('excel') || mime.includes('spreadsheetml')) return { label: 'XLS', color: 'bg-emerald-100 text-emerald-600' };
     return { label: 'FILE', color: 'bg-slate-100 text-slate-600' };
   };
 
@@ -183,7 +215,6 @@ const RecordScreen: React.FC<RecordProps> = ({
            </button>
         </div>
         
-        {/* Edge-to-edge Observation Notes input box */}
         <div className="-mx-4 bg-white border-y border-slate-200 shadow-sm relative overflow-hidden">
           <textarea
             className="w-full h-48 p-6 text-lg font-bold text-[#1B1B1F] bg-transparent outline-none resize-none placeholder-slate-300"
@@ -273,7 +304,21 @@ const RecordScreen: React.FC<RecordProps> = ({
                  <p className="font-black text-[#001D36] uppercase text-xs tracking-widest">{viewingAttachment.name}</p>
                </div>
              ) : (
-               <div className="text-white font-black">Document view not supported here.</div>
+               <div className="text-white font-black text-center p-6 space-y-4">
+                 <p className="text-xl">Document view not supported here.</p>
+                 <button 
+                   onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = viewingAttachment.data;
+                      link.download = viewingAttachment.name;
+                      link.click();
+                      setViewingAttachment(null);
+                   }}
+                   className="m3-button-primary"
+                 >
+                   Download to View
+                 </button>
+               </div>
              )}
            </div>
         </div>

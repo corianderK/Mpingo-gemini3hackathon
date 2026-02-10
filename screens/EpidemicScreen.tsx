@@ -183,6 +183,16 @@ Questionnaire Data:
 
   if (!currentPatient) return <div className="p-10 text-center opacity-40"><p className="font-black">Select a patient first.</p></div>;
 
+  // Case-insensitive risk color logic
+  const getRiskColorClass = () => {
+    if (!analysisResult) return 'bg-emerald-600 text-white';
+    const r = analysisResult.riskLevel.toUpperCase();
+    if (r.includes('CRITICAL') || r.includes('HIGH') || r.includes('SEVERE') || r.includes('EMERGENCY')) {
+      return 'bg-rose-600 text-white';
+    }
+    return 'bg-emerald-600 text-white';
+  };
+
   return (
     <div className="p-4 space-y-6 pb-40">
       <div className="space-y-2 px-2">
@@ -313,9 +323,7 @@ Questionnaire Data:
 
       {phase === Phase.RESULTS && analysisResult && (
         <div className="space-y-6 animate-in zoom-in-95 duration-500">
-          <div className={`rounded-[32px] p-8 shadow-xl ${
-            analysisResult.riskLevel.includes('Critical') || analysisResult.riskLevel.includes('High') || analysisResult.riskLevel.includes('Severe') ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'
-          }`}>
+          <div className={`rounded-[32px] p-8 shadow-xl transition-colors duration-500 ${getRiskColorClass()}`}>
              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-1">Categorization</p>
              <h2 className="text-3xl font-black leading-tight">{analysisResult.riskLevel}</h2>
              <div className="mt-6 p-5 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30">

@@ -128,37 +128,48 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isGeminiSupportedMime = (mime: string) => {
+    const supported = [
+      'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif',
+      'application/pdf',
+      'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac',
+      'video/mp4', 'video/mpeg', 'video/mov', 'video/avi', 'video/x-flv', 'video/mpg', 'video/webm', 'video/wmv', 'video/3gpp'
+    ];
+    return supported.includes(mime) || mime.startsWith('image/') || mime.startsWith('audio/') || mime.startsWith('video/');
+  };
+
   const processCapture = async (base64Full: string, type: string, name: string) => {
     setIsProcessing(true);
     setCurrentFile({ name, type, data: base64Full });
+    setOcrResult(null);
+
     try {
       const base64Data = base64Full.split(',')[1];
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      let prompt = '';
       let parts: any[] = [];
+      const isTextFile = type === 'application/json' || type === 'text/csv' || type === 'text/plain';
+      const isWordExcel = type.includes('msword') || type.includes('wordprocessingml') || type.includes('excel') || type.includes('spreadsheetml');
 
-      if (type.startsWith('image/')) {
-        prompt = `Extract medical/endemic data into JSON: { "summary": "markdown string", "documentDate": "YYYY-MM-DD" }. Respond in ${language === 'en' ? 'English' : 'Portuguese'}.`;
-        parts = [
-          { inlineData: { mimeType: type, data: base64Data } },
-          { text: prompt }
-        ];
-      } else if (type === 'application/json' || type === 'text/csv' || type === 'text/plain') {
-        // Handle JSON/CSV/Text specifically for accuracy testing
+      if (isTextFile) {
+        // Decode base64 to text for JSON/CSV/TXT so AI can read it as a string
         const decodedText = atob(base64Data);
-        prompt = `Analyze this clinical data file (${type}). It may contain patient symptoms or test cases. Provide a concise summary of the clinical findings and any endemic disease risks detected. Respond in ${language === 'en' ? 'English' : 'Portuguese'}.`;
-        parts = [
-          { text: `FILE CONTENT:\n${decodedText}` },
-          { text: prompt }
-        ];
-      } else {
-        // Generic audio/video/pdf
-        prompt = `Analyze this clinical recording/file. Summarize findings related to symptoms and endemic risks. Respond in ${language === 'en' ? 'English' : 'Portuguese'}.`;
+        parts = [{ text: `Clinical data from file "${name}" (${type}):\n\n${decodedText}\n\nSummarize the medical findings and endemic risks.` }];
+      } else if (isGeminiSupportedMime(type)) {
+        // Standard multimodal handling (Image, PDF, Audio, Video)
+        const promptText = type.startsWith('image/') 
+          ? `Extract clinical data into JSON: { "summary": "markdown string", "documentDate": "YYYY-MM-DD" }. Respond in ${language === 'en' ? 'English' : 'Portuguese'}.`
+          : `Analyze this clinical file (${name}). Summarize findings and endemic risks. Respond in ${language === 'en' ? 'English' : 'Portuguese'}.`;
+        
         parts = [
           { inlineData: { mimeType: type, data: base64Data } },
-          { text: prompt }
+          { text: promptText }
         ];
+      } else if (isWordExcel) {
+        // Fallback for Word/Excel which cannot be sent as inlineData
+        parts = [{ text: `The user has uploaded a clinical document named "${name}" (${type}). Since this is a binary document format, please provide a general note that the file is attached and suggest that the clinician reviews it manually for detailed classification accuracy tests.` }];
+      } else {
+        parts = [{ text: `Uploaded file: ${name}. Summarize context based on filename.` }];
       }
 
       const response = await ai.models.generateContent({
@@ -168,14 +179,21 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
       });
 
       if (type.startsWith('image/')) {
-        const data = JSON.parse(response.text || '{}');
-        setOcrResult(data.summary);
-        setExtractedDate(data.documentDate);
+        try {
+          const data = JSON.parse(response.text || '{}');
+          setOcrResult(data.summary);
+          setExtractedDate(data.documentDate);
+        } catch {
+          setOcrResult(response.text);
+        }
       } else {
         setOcrResult(response.text);
       }
     } catch (e) {
-      setOcrResult("File processed. Summary unavailable.");
+      console.error("AI analysis error:", e);
+      setOcrResult(language === 'en' 
+        ? "File attached successfully. AI automated analysis is currently unavailable for this binary format." 
+        : "Arquivo anexado com sucesso. A análise automatizada por IA não está disponível no momento para este formato binário.");
     } finally {
       setIsProcessing(false);
     }
@@ -189,7 +207,7 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
       operatorRole: OperatorRole.CLINICIAN,
       timestamp: Date.now(),
       documentDate: extractedDate ? Date.parse(extractedDate) : Date.now(),
-      content: ocrResult || "Clinical media attached.",
+      content: ocrResult || "Clinical file attached.",
       attachments: [{
         id: `att-${Date.now()}`,
         name: currentFile.name,
@@ -199,6 +217,15 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
     };
     setMedicalRecords(prev => [newRecord, ...prev]);
     navigate('/record');
+  };
+
+  const getFileTag = (type: string) => {
+    if (type.includes('json')) return 'JSON';
+    if (type.includes('csv')) return 'CSV';
+    if (type.includes('excel') || type.includes('spreadsheetml')) return 'XLS';
+    if (type.includes('msword') || type.includes('wordprocessingml')) return 'DOC';
+    if (type.includes('pdf')) return 'PDF';
+    return 'DATA';
   };
 
   return (
@@ -282,6 +309,15 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
               {s.CAPTURE_DESC} {currentPatient?.fullName}
             </p>
           </div>
+
+          <div className="m3-card p-4 bg-blue-50/50 border-blue-100 flex gap-3 items-center">
+             <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
+               <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+             </div>
+             <p className="text-[10px] font-black text-blue-800 tracking-tight leading-tight uppercase italic">
+               {s.SUPPORTED_FORMATS}
+             </p>
+          </div>
           
           <div className="grid grid-cols-2 gap-4">
             <button onClick={() => setCameraMode('photo')} className="m3-card p-6 flex flex-col items-center justify-center gap-4 active:bg-blue-50 transition-colors group">
@@ -314,7 +350,7 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept="image/*,video/*,audio/*,application/pdf,application/json,text/csv,text/plain"
+                accept="image/*,video/*,audio/*,application/pdf,application/json,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(e) => {
                  const file = e.target.files?.[0];
                  if (file) {
@@ -350,8 +386,7 @@ const ArchiveScreen: React.FC<ArchiveProps> = ({ currentPatient, medicalRecords,
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{l.AI_TRANSCRIPTION}</span>
-                {currentFile.type.includes('json') && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-black uppercase">JSON</span>}
-                {currentFile.type.includes('csv') && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-black uppercase">CSV</span>}
+                <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-black uppercase">{getFileTag(currentFile.type)}</span>
               </div>
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             </div>
